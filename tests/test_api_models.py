@@ -1,14 +1,8 @@
 import pytest
 from pydantic import ValidationError
-from agent_models import (
-    ExecuteRequest,
-    ExecuteResponse,
-    AgentManifest,
-    ExecutionLimits,
-    MicroGraph,
-    Prompts,
-    Node
-)
+from app.models.api import ExecuteRequest, ExecuteResponse
+from app.models.manifest import AgentManifest, ExecutionLimits, Prompts
+from app.models.graph import MicroGraph, Node
 
 def get_valid_manifest_dict():
     return {

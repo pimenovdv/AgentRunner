@@ -21,7 +21,7 @@
 - [x] **2.1. Разработка моделей для API эндпоинта:**
   - Создать Pydantic-модель `ExecuteRequest` для `POST /api/v1/player/execute`, включающую поля `execution_id`, `agent_manifest`, `input_context`, `execution_limits` (`max_tokens`, `timeout_ms`).
   - Создать Pydantic-модель `ExecuteResponse`, описывающую структуру успешного ответа (`status`, `output_data`, `telemetry`).
-- [ ] **2.2. Моделирование структуры JSON-манифеста агента (`agent_manifest`):**
+- [x] **2.2. Моделирование структуры JSON-манифеста агента (`agent_manifest`):**
   - Описать модели секций манифеста: `input_schema`, `output_schema` (с поддержкой JSON Schema).
   - Создать модели для секции `prompts` (System Instructions, Guardrails).
   - Реализовать модели для структуры графа (Micro-Graph): `nodes` (типы узлов: `reasoning`, `tool_execution`, `data_transformation`), `edges`, `conditions`.
@@ -30,6 +30,10 @@
     - `RestApiTool` (с полями `method`, `base_url`, `parameters_schema`, маппингом заголовков).
     - `McpTool` (настройки подключения к серверу MCP).
     - `KafkaTool` (topic, role, `payload_schema`).
+- [ ] **2.3. Дополнительные модели (Missing Models):**
+  - Создать Pydantic-модели для `LlmConfig` (настройки LLM: provider, model_name, temperature).
+  - Создать модель для LangGraph State (`State`, `Message`, `ToolCall`).
+  - Создать модель для настройки Retry-политик (Exponential Backoff, Max Retries).
 
 ---
 
