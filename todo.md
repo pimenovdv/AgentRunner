@@ -18,7 +18,7 @@
 ---
 
 ## Этап 2: Проектирование API контрактов и моделей данных (Pydantic)
-- [ ] **2.1. Разработка моделей для API эндпоинта:**
+- [x] **2.1. Разработка моделей для API эндпоинта:**
   - Создать Pydantic-модель `ExecuteRequest` для `POST /api/v1/player/execute`, включающую поля `execution_id`, `agent_manifest`, `input_context`, `execution_limits` (`max_tokens`, `timeout_ms`).
   - Создать Pydantic-модель `ExecuteResponse`, описывающую структуру успешного ответа (`status`, `output_data`, `telemetry`).
 - [ ] **2.2. Моделирование структуры JSON-манифеста агента (`agent_manifest`):**
