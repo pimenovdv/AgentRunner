@@ -1,8 +1,22 @@
 from pydantic import BaseModel, Field
 from typing import Dict, Any, Optional, Literal, Union
+from enum import StrEnum
+
+class HttpMethod(StrEnum):
+    GET = "GET"
+    POST = "POST"
+    PATCH = "PATCH"
+    PUT = "PUT"
+    DELETE = "DELETE"
+
+class ToolType(StrEnum):
+    BUILTIN = "builtin"
+    REST_API = "rest_api"
+    MCP_SERVER = "mcp_server"
+    KAFKA = "kafka"
 
 class RestApiConfig(BaseModel):
-    method: Literal["GET", "POST", "PATCH", "PUT", "DELETE"] = Field(description="HTTP метод (GET, POST, PATCH и др.)")
+    method: HttpMethod = Field(description="HTTP метод (GET, POST, PATCH и др.)")
     base_url: str = Field(description="Базовый URL")
     headers: Optional[Dict[str, str]] = Field(default=None, description="Конфигурация заголовков")
     authentication: Optional[Dict[str, Any]] = Field(default=None, description="Правила аутентификации")
@@ -24,19 +38,19 @@ class BaseTool(BaseModel):
     description: Optional[str] = Field(default=None, description="Описание инструмента")
 
 class BuiltinTool(BaseTool):
-    type: Literal["builtin"] = Field(description="Тип инструмента")
+    type: Literal[ToolType.BUILTIN] = Field(description="Тип инструмента")
     builtin_config: BuiltinConfig = Field(description="Конфигурация для встроенных инструментов")
 
 class RestApiTool(BaseTool):
-    type: Literal["rest_api"] = Field(description="Тип инструмента")
+    type: Literal[ToolType.REST_API] = Field(description="Тип инструмента")
     rest_api_config: RestApiConfig = Field(description="Конфигурация для REST API инструмента")
 
 class McpTool(BaseTool):
-    type: Literal["mcp_server"] = Field(description="Тип инструмента")
+    type: Literal[ToolType.MCP_SERVER] = Field(description="Тип инструмента")
     mcp_server_config: McpServerConfig = Field(description="Конфигурация для MCP сервера")
 
 class KafkaTool(BaseTool):
-    type: Literal["kafka"] = Field(description="Тип инструмента")
+    type: Literal[ToolType.KAFKA] = Field(description="Тип инструмента")
     kafka_config: KafkaConfig = Field(description="Конфигурация для Kafka")
 
 Tool = Union[BuiltinTool, RestApiTool, McpTool, KafkaTool]

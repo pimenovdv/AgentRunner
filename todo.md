@@ -30,7 +30,7 @@
     - `RestApiTool` (с полями `method`, `base_url`, `parameters_schema`, маппингом заголовков).
     - `McpTool` (настройки подключения к серверу MCP).
     - `KafkaTool` (topic, role, `payload_schema`).
-- [ ] **2.3. Дополнительные модели (Missing Models):**
+- [x] **2.3. Дополнительные модели (Missing Models):**
   - Создать Pydantic-модели для `LlmConfig` (настройки LLM: provider, model_name, temperature).
   - Создать модель для LangGraph State (`State`, `Message`, `ToolCall`).
   - Создать модель для настройки Retry-политик (Exponential Backoff, Max Retries).
