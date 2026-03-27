@@ -1,6 +1,7 @@
 from pydantic import BaseModel, Field
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Annotated
 from enum import StrEnum
+import operator
 
 class MessageRole(StrEnum):
     SYSTEM = "system"
@@ -20,6 +21,6 @@ class Message(BaseModel):
     tool_call_id: Optional[str] = Field(default=None, description="ID вызова инструмента, к которому относится ответ (для роли tool)")
 
 class State(BaseModel):
-    messages: List[Message] = Field(default_factory=list, description="История сообщений в графе")
+    messages: Annotated[List[Message], operator.add] = Field(default_factory=list, description="История сообщений в графе")
     input_context: Dict[str, Any] = Field(default_factory=dict, description="Входной контекст данных для агента")
     # Дополнительные поля состояния могут быть добавлены позже по мере необходимости
