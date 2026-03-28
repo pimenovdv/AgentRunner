@@ -152,3 +152,37 @@ async def test_tool_execution_node_direct(manifest_with_tools):
     assert tool_msg.role == MessageRole.TOOL
     assert tool_msg.tool_call_id == "call_456"
     assert "50.0" in tool_msg.content
+
+@pytest.mark.asyncio
+async def test_graph_builder_loop_bounds():
+    manifest = AgentManifest(
+        input_schema={},
+        output_schema={},
+        prompts=Prompts(system_instructions="Test loop bounds"),
+        execution_limits=ExecutionLimits(max_steps=5),
+        graph=MicroGraph(
+            nodes=[
+                Node(id="node_a", type=NodeType.DATA_TRANSFORMATION),
+                Node(id="node_b", type=NodeType.DATA_TRANSFORMATION)
+            ],
+            edges=[
+                Edge(source="node_a", target="node_b"),
+                Edge(source="node_b", target="node_a")
+            ]
+        )
+    )
+
+    builder = GraphBuilder(manifest)
+    app = builder.build()
+
+    state = State(input_context={}, step_count=0)
+
+    # Invoke the graph, it should hit the loop bound (max_steps=5) and return to fallback node.
+    # Without loop protection, this would hang indefinitely.
+    res = await app.ainvoke(state)
+
+    # It should have executed 5 steps, hit the router which returns __fallback_node__,
+    # and then the fallback node should add the error message.
+    assert res["step_count"] >= 5
+    assert len(res["messages"]) == 1
+    assert "exceeded maximum allowed steps" in res["messages"][0].content

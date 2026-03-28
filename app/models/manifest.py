@@ -7,6 +7,7 @@ from app.models.graph import MicroGraph
 class ExecutionLimits(BaseModel):
     max_tokens: int = Field(default=8000, description="Максимальное количество токенов")
     timeout_ms: int = Field(default=60000, description="Таймаут выполнения в миллисекундах")
+    max_steps: int = Field(default=30, description="Максимальное количество шагов (узлов) для защиты от бесконечных циклов")
 
 class Prompts(BaseModel):
     system_instructions: str = Field(description="Системные инструкции (описание роли, формат рассуждений)")
