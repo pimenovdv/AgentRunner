@@ -145,9 +145,13 @@ def _safe_eval_condition(expression: str, context: dict[str, Any]) -> bool:
     result = _eval(parsed.body)
     return bool(result)
 
-def create_router(edges: List[Edge]) -> Callable[[State], str]:
+def create_router(edges: List[Edge], max_steps: int) -> Callable[[State], str]:
     """Creates a routing function for conditional edges based on manifest conditions using a safe AST evaluator."""
     def router(state: State) -> str:
+        if state.step_count >= max_steps:
+            logger.warning("max_steps_reached_fallback_triggered", step_count=state.step_count, max_steps=max_steps)
+            return "__fallback_node__"
+
         # We find fallback edges without a condition
         fallback_target = END
         for edge in edges:
@@ -282,7 +286,7 @@ class GraphBuilder:
                     # Fallback to stub if no LLM configured (e.g., in some tests)
                     ctx = dict(state.input_context)
                     ctx["_last_node_executed"] = node.id
-                    return {"input_context": ctx}
+                    return {"input_context": ctx, "step_count": 1}
 
                 # 1. Prepare chat model
                 if self.llm_config.provider == LlmProvider.OPENAI:
@@ -336,7 +340,7 @@ class GraphBuilder:
 
                 ctx = dict(state.input_context)
                 ctx["_last_node_executed"] = node.id
-                return {"messages": [out_msg], "input_context": ctx}
+                return {"messages": [out_msg], "input_context": ctx, "step_count": 1}
 
             reasoning_executor.__name__ = f"node_{node.id}"
             return reasoning_executor
@@ -348,7 +352,7 @@ class GraphBuilder:
                 ctx["_last_node_executed"] = node.id
 
                 if not state.messages:
-                    return {"input_context": ctx}
+                    return {"input_context": ctx, "step_count": 1}
 
                 # Find the last AIMessage with tool calls
                 last_msg = None
@@ -359,7 +363,7 @@ class GraphBuilder:
 
                 if not last_msg:
                     logger.warning("no_tool_call_found_in_state", node_id=node.id)
-                    return {"input_context": ctx}
+                    return {"input_context": ctx, "step_count": 1}
 
                 # Find the specific tool call matching this node's tool_name
                 tool_call = None
@@ -370,13 +374,13 @@ class GraphBuilder:
 
                 if not tool_call:
                      logger.warning("tool_call_name_mismatch", node_id=node.id, expected=node.tool_name)
-                     return {"input_context": ctx}
+                     return {"input_context": ctx, "step_count": 1}
 
                 # Execute the tool
                 tools_dict = {t.name: t for t in self._get_langchain_tools()}
                 if tool_call.name not in tools_dict:
                     out_msg = Message(role=MessageRole.TOOL, content=f"Error: Tool {tool_call.name} not found", tool_call_id=tool_call.id)
-                    return {"messages": [out_msg], "input_context": ctx}
+                    return {"messages": [out_msg], "input_context": ctx, "step_count": 1}
 
                 tool = tools_dict[tool_call.name]
                 try:
@@ -391,7 +395,7 @@ class GraphBuilder:
                     tool_call_id=tool_call.id
                 )
 
-                return {"messages": [out_msg], "input_context": ctx}
+                return {"messages": [out_msg], "input_context": ctx, "step_count": 1}
 
             tool_executor.__name__ = f"node_{node.id}"
             return tool_executor
@@ -402,7 +406,7 @@ class GraphBuilder:
                 logger.info("executing_node", node_id=node.id, node_type=node.type)
                 ctx = dict(state.input_context)
                 ctx["_last_node_executed"] = node.id
-                return {"input_context": ctx}
+                return {"input_context": ctx, "step_count": 1}
 
             node_executor.__name__ = f"node_{node.id}"
             return node_executor
@@ -413,7 +417,7 @@ class GraphBuilder:
             logger.warning("empty_graph_nodes")
             # LangGraph requires at least one start point
             async def empty_node(state: State) -> Dict[str, Any]:
-                return {}
+                return {"step_count": 1}
             empty_node.__name__ = "empty_node"
             self.graph.add_node("empty_node", empty_node)
             self.graph.add_edge(START, "empty_node")
@@ -427,30 +431,43 @@ class GraphBuilder:
         # 2. Add edges to determine graph structure
         targets = {edge.target for edge in self.manifest.graph.edges}
         start_nodes = [node.id for node in self.manifest.graph.nodes if node.id not in targets]
+        if not start_nodes and self.manifest.graph.nodes:
+            start_nodes = [self.manifest.graph.nodes[0].id]
 
         # Connect START to initial node(s)
         for start_node in start_nodes:
             self.graph.add_edge(START, start_node)
+
+        # Add fallback node
+        async def fallback_node(state: State) -> Dict[str, Any]:
+            logger.error("fallback_node_executed", reason="max_steps_reached")
+            out_msg = Message(
+                role=MessageRole.ASSISTANT,
+                content="Error: Execution exceeded maximum allowed steps (loop detected)."
+            )
+            return {"messages": [out_msg]}
+        fallback_node.__name__ = "fallback_node"
+        self.graph.add_node("__fallback_node__", fallback_node)
+        self.graph.add_edge("__fallback_node__", END)
 
         # Group outgoing edges by source
         source_edges: Dict[str, List[Edge]] = {}
         for edge in self.manifest.graph.edges:
             source_edges.setdefault(edge.source, []).append(edge)
 
+        max_steps = self.manifest.execution_limits.max_steps
+
         # Add edges and routers
         for source, edges in source_edges.items():
-            if len(edges) == 1 and (edges[0].condition is None or not edges[0].condition.condition_expression):
-                # Simple sequential edge
-                self.graph.add_edge(source, edges[0].target)
-            else:
-                # Conditional routing (Skip Logic)
-                router = create_router(edges)
+            # Conditional routing (Skip Logic) to handle max steps bounds ALWAYS
+            router = create_router(edges, max_steps=max_steps)
 
-                # Path map explicitly maps all possible return values of the router function to target nodes
-                path_map = {e.target: e.target for e in edges}
-                path_map[END] = END
+            # Path map explicitly maps all possible return values of the router function to target nodes
+            path_map = {e.target: e.target for e in edges}
+            path_map[END] = END
+            path_map["__fallback_node__"] = "__fallback_node__"
 
-                self.graph.add_conditional_edges(source, router, path_map)
+            self.graph.add_conditional_edges(source, router, path_map)
 
         # Connect leaf nodes (nodes with no outgoing edges) to END
         sources = {edge.source for edge in self.manifest.graph.edges}

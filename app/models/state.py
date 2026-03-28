@@ -23,4 +23,5 @@ class Message(BaseModel):
 class State(BaseModel):
     messages: Annotated[List[Message], operator.add] = Field(default_factory=list, description="История сообщений в графе")
     input_context: Dict[str, Any] = Field(default_factory=dict, description="Входной контекст данных для агента")
+    step_count: Annotated[int, operator.add] = Field(default=0, description="Счетчик шагов (узлов) для защиты от зацикливания")
     # Дополнительные поля состояния могут быть добавлены позже по мере необходимости
