@@ -8,6 +8,7 @@ from mcp.client.sse import sse_client
 from mcp.client.session import ClientSession
 
 from app.models.tools import McpTool
+from app.services.retry_utils import with_retry
 
 class McpClient:
     def __init__(self, tool: McpTool):
@@ -15,6 +16,18 @@ class McpClient:
         self.config = tool.mcp_server_config
         self._session: Optional[ClientSession] = None
         self._exit_stack = AsyncExitStack()
+
+    @with_retry(max_retries=3, backoff_factor=2.0)
+    async def _initialize_session(self):
+        await self._session.initialize()
+
+    @with_retry(max_retries=3, backoff_factor=2.0)
+    async def _list_tools(self):
+        return await self._session.list_tools()
+
+    @with_retry(max_retries=3, backoff_factor=2.0)
+    async def _call_tool_mcp(self, tool_name: str, arguments: Dict[str, Any]):
+        return await self._session.call_tool(tool_name, arguments)
 
     async def connect(self):
         """Connect to the MCP server depending on the transport (stdio or sse)"""
@@ -40,14 +53,15 @@ class McpClient:
         self._session = await self._exit_stack.enter_async_context(
             ClientSession(read_stream, write_stream)
         )
-        await self._session.initialize()
+
+        await self._initialize_session()
 
     async def get_tools(self) -> List[Dict[str, Any]]:
         """Call tools/list to dynamically push the tool manifest to the LLM"""
         if not self._session:
             raise RuntimeError("MCP Client is not connected. Call connect() first.")
 
-        tools_response = await self._session.list_tools()
+        tools_response = await self._list_tools()
         result = []
         for t in tools_response.tools:
             result.append({
@@ -62,7 +76,7 @@ class McpClient:
         if not self._session:
             raise RuntimeError("MCP Client is not connected. Call connect() first.")
 
-        result = await self._session.call_tool(tool_name, arguments)
+        result = await self._call_tool_mcp(tool_name, arguments)
         return result
 
     async def disconnect(self):

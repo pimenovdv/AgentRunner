@@ -4,6 +4,7 @@ from typing import Any, Dict, Optional
 import httpx
 from jsonschema import validate, ValidationError
 from jsonpath_ng import parse
+from app.services.retry_utils import with_retry
 
 class VaultSecretFetcher:
     """Mock-хранилище секретов"""
@@ -88,6 +89,13 @@ class RestApiClient:
         except Exception as e:
             raise ValueError(f"Error applying JSONPath expression '{jsonpath_expr}': {str(e)}") from e
 
+
+    @with_retry(max_retries=3, backoff_factor=2.0)
+    async def _make_request(self, method: str, url: str, headers: Dict[str, str], kwargs: Dict[str, Any]) -> Any:
+        response = await self.client.request(method, url, headers=headers, **kwargs)
+        response.raise_for_status()
+        return response
+
     async def execute(self,
                       method: str,
                       base_url: str,
@@ -134,8 +142,7 @@ class RestApiClient:
                 kwargs["json"] = parameters
 
         # 5. Вызов
-        response = await self.client.request(method, url, headers=request_headers, **kwargs)
-        response.raise_for_status()
+        response = await self._make_request(method, url, request_headers, kwargs)
 
         try:
             response_data = response.json()

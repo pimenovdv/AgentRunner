@@ -13,6 +13,7 @@ from app.models.state import State, Message, MessageRole, ToolCall
 from app.models.llm import LlmConfig, LlmProvider
 from app.models.tools import Tool, ToolType
 from app.models.builtin_tools import BUILTIN_TOOLS
+from app.services.retry_utils import with_retry
 
 # Dynamic import to avoid missing dependencies
 try:
@@ -254,6 +255,10 @@ def _convert_tool_to_langchain(tool_def: Tool) -> Any:
 
     raise ValueError(f"Unsupported tool type: {tool_def.type}")
 
+@with_retry(max_retries=3, backoff_factor=2.0)
+async def _invoke_llm_with_retry(chat_model: Any, lc_messages: List[Any]) -> Any:
+    return await chat_model.ainvoke(lc_messages)
+
 class GraphBuilder:
     """Builds a LangGraph StateGraph dynamically from an AgentManifest."""
     def __init__(self, manifest: AgentManifest, llm_config: Optional[LlmConfig] = None):
@@ -315,7 +320,7 @@ class GraphBuilder:
                         lc_messages.append(LangchainToolMessage(content=msg.content or "", tool_call_id=msg.tool_call_id or ""))
 
                 # 4. Invoke model
-                response = await chat_model.ainvoke(lc_messages)
+                response = await _invoke_llm_with_retry(chat_model, lc_messages)
 
                 # 5. Convert response to state Message
                 tool_calls_out = []
