@@ -101,6 +101,8 @@ async def execute_player(request: ExecuteRequest) -> ExecuteResponse:
             telemetry={
                 "execution_time_ms": execution_time_ms,
                 "step_count": final_state.step_count,
+                "used_tokens": final_state.used_tokens,
+                "called_tools": final_state.called_tools,
             }
         )
 
