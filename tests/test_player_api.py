@@ -47,7 +47,7 @@ def test_execute_player_success():
     assert response.status_code == 200
     data = response.json()
     assert data["status"] == "success"
-    assert data["output_data"] == {}
+    assert "question" in data["output_data"]
     assert "telemetry" in data
 
 
