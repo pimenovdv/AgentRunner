@@ -2,7 +2,7 @@ import structlog
 import ast
 import operator
 from typing import Callable, Dict, Any, List, Optional
-from pydantic import create_model
+from pydantic import create_model, ValidationError
 
 from langgraph.graph import StateGraph, START, END
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, ToolMessage as LangchainToolMessage
@@ -385,6 +385,10 @@ class GraphBuilder:
                 tool = tools_dict[tool_call.name]
                 try:
                     result = await tool.ainvoke(tool_call.arguments)
+                except ValidationError as e:
+                    logger.warning("tool_validation_error", error=str(e), tool_name=tool_call.name)
+                    # Формируем системное сообщение об ошибке валидации Pydantic (возвращается как TOOL message для корректной маршрутизации Chat API)
+                    result = f"Validation Error in tool arguments:\n{str(e)}\n\nPlease correct the JSON structure and try again."
                 except Exception as e:
                     logger.error("tool_execution_failed", error=str(e), tool_name=tool_call.name)
                     result = f"Error executing tool: {e}"

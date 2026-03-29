@@ -186,3 +186,45 @@ async def test_graph_builder_loop_bounds():
     assert res["step_count"] >= 5
     assert len(res["messages"]) == 1
     assert "exceeded maximum allowed steps" in res["messages"][0].content
+
+@pytest.mark.asyncio
+async def test_tool_execution_node_validation_error(manifest_with_tools):
+    from pydantic import ValidationError
+
+    builder = GraphBuilder(manifest_with_tools)
+    app = builder.build()
+
+    assistant_msg = Message(
+        role=MessageRole.ASSISTANT,
+        content="Calculating...",
+        tool_calls=[ToolCall(id="call_789", name="calc", arguments={"wrong_arg": "abc"})]
+    )
+
+    node = [n for n in manifest_with_tools.graph.nodes if n.id == "tool_node"][0]
+    func = builder._create_node_func(node)
+
+    state = State(messages=[assistant_msg], input_context={})
+
+    # We mock the tool ainvoke to throw ValidationError
+    # We can mock `_get_langchain_tools` on builder
+    with patch.object(builder, '_get_langchain_tools') as mock_get_tools:
+        mock_tool = AsyncMock()
+        mock_tool.name = "calc"
+        # Since pydantic ValidationError needs errors, model, etc., we can mock it
+        from pydantic import BaseModel
+        class DummyModel(BaseModel):
+            pass
+
+        mock_tool.ainvoke.side_effect = ValidationError.from_exception_data("Dummy validation error", line_errors=[], input_type="python")
+        mock_get_tools.return_value = [mock_tool]
+
+        res = await func(state)
+
+        assert "messages" in res
+        assert len(res["messages"]) == 1
+        tool_msg = res["messages"][0]
+
+        assert tool_msg.role == MessageRole.TOOL
+        assert tool_msg.tool_call_id == "call_789"
+        assert "Validation Error in tool arguments" in tool_msg.content
+        assert "Please correct the JSON structure and try again." in tool_msg.content
