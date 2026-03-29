@@ -338,9 +338,14 @@ class GraphBuilder:
                     tool_calls=tool_calls_out if tool_calls_out else None
                 )
 
+                # Extract token usage if available
+                used_tokens = 0
+                if hasattr(response, "response_metadata"):
+                    used_tokens = response.response_metadata.get("token_usage", {}).get("total_tokens", 0)
+
                 ctx = dict(state.input_context)
                 ctx["_last_node_executed"] = node.id
-                return {"messages": [out_msg], "input_context": ctx, "step_count": 1}
+                return {"messages": [out_msg], "input_context": ctx, "step_count": 1, "used_tokens": used_tokens}
 
             reasoning_executor.__name__ = f"node_{node.id}"
             return reasoning_executor
@@ -399,7 +404,7 @@ class GraphBuilder:
                     tool_call_id=tool_call.id
                 )
 
-                return {"messages": [out_msg], "input_context": ctx, "step_count": 1}
+                return {"messages": [out_msg], "input_context": ctx, "step_count": 1, "called_tools": [tool_call.name]}
 
             tool_executor.__name__ = f"node_{node.id}"
             return tool_executor
