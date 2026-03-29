@@ -1,4 +1,4 @@
-
+content = """
 from fastapi import APIRouter, HTTPException
 from jsonschema import validate, ValidationError
 import structlog
@@ -20,9 +20,9 @@ router = APIRouter()
 
 @router.post("/execute", response_model=ExecuteResponse)
 async def execute_player(request: ExecuteRequest) -> ExecuteResponse:
-    """
+    \"\"\"
     Эндпоинт для запуска графа агента с валидацией входных данных.
-    """
+    \"\"\"
     logger.info("execute_player_called", execution_id=request.execution_id)
 
     # 6.2 Входная валидация
@@ -74,7 +74,7 @@ async def execute_player(request: ExecuteRequest) -> ExecuteResponse:
                     context_str = str(final_state.input_context)
 
                     sys_msg = SystemMessage(content="Extract the structured output according to the provided schema based on the given context.")
-                    usr_msg = HumanMessage(content=f"Context:\n{context_str}")
+                    usr_msg = HumanMessage(content=f"Context:\\n{context_str}")
 
                     output_data = await structured_llm.ainvoke([sys_msg, usr_msg])
                     # Ensure output_data is a dict (if it returns a Pydantic object, dump it)
@@ -126,3 +126,6 @@ async def execute_player(request: ExecuteRequest) -> ExecuteResponse:
                 "error": str(e)
             }
         )
+"""
+with open("app/api/routes/player.py", "w") as f:
+    f.write(content)
