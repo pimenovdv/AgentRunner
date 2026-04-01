@@ -197,6 +197,7 @@ def _convert_tool_to_langchain(tool_def: Tool) -> Any:
         fields = {}
         if "properties" in schema:
             for k, v in schema["properties"].items():
+                from typing import Any
                 fields[k] = (Any, ...) if k in schema.get("required", []) else (Any, None)
 
         ArgsSchema = create_model(f"{tool_def.name}Args", **fields)
@@ -226,6 +227,7 @@ def _convert_tool_to_langchain(tool_def: Tool) -> Any:
         fields = {}
         if "properties" in schema:
             for k, v in schema["properties"].items():
+                from typing import Any
                 fields[k] = (Any, ...) if k in schema.get("required", []) else (Any, None)
 
         ArgsSchema = create_model(f"{tool_def.name}Args", **fields)

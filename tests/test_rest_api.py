@@ -112,3 +112,9 @@ async def test_execute_rest_api_call(client):
             headers={},
             params={"user_id": 42}
         )
+
+def test_interpolate_template_body(client):
+    template = '{"user_id": "{user_id}", "name": "{name}"}'
+    params = {"user_id": 42, "name": "Alice"}
+    interpolated = client.interpolate_template(template, params)
+    assert interpolated == '{"user_id": "42", "name": "Alice"}'

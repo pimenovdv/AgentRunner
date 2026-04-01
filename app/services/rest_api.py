@@ -42,7 +42,7 @@ class RestApiClient:
                 return str(params[key])
             return match.group(0) # leave untouched if not found
 
-        return re.sub(r'\{([^}]+)\}', replace, template)
+        return re.sub(r'\{([a-zA-Z0-9_]+)\}', replace, template)
 
     def inject_secrets(self, headers: Dict[str, str], auth_config: Optional[Dict[str, Any]]) -> Dict[str, str]:
         """
