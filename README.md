@@ -1,62 +1,62 @@
-# AgentRunner: Execution Engine for Multi-Agent Platform
+# AgentRunner: Механизм выполнения для мультиагентной платформы
 
-AgentRunner is an execution engine (Player) designed for a multi-agent orchestration platform. It is developed using **FastAPI** and **LangGraph**, providing a scalable and reliable environment for executing complex multi-agent workflows defined via declarative JSON manifests.
+AgentRunner — это механизм выполнения (Player), разработанный для платформы мультиагентной оркестрации. Он создан с использованием **FastAPI** и **LangGraph** и предоставляет масштабируемую и надежную среду для выполнения сложных мультиагентных рабочих процессов (workflows), определенных с помощью декларативных JSON-манифестов.
 
-## Features
+## Особенности
 
-*   **Dynamic Graph Execution:** Dynamically constructs and executes a LangGraph `StateGraph` from JSON manifests, mapping nodes to async Python functions and edges to secure conditional routing logic.
-*   **Secure Routing:** Uses an AST parser to safely evaluate string-based conditional routing rules from JSON manifests, avoiding arbitrary code execution (ACE) vulnerabilities associated with `eval()`.
-*   **Timeouts at Orchestration Level:** Strictly enforces execution timeouts using `asyncio.wait_for` at the API orchestration level.
-*   **Extensive Tool Support:**
-    *   **Built-in Tools:** Secure local operations like an AST-based calculator and date formatting.
-    *   **REST API Integration:** Declarative calls using `httpx.AsyncClient` with `jsonschema` validation for LLM arguments, and `jsonpath-ng` to extract payload data, saving context tokens. Template interpolation strictly uses `r'\{([a-zA-Z0-9_]+)\}'` to avoid matching JSON payload braces.
-    *   **MCP (Model Context Protocol):** Integrates tools dynamically retrieved from an MCP server via SSE or stdio transports using `contextlib.AsyncExitStack` for async lifecycle management. Converts external tools into LangChain-compatible objects.
-    *   **Kafka Messaging:** Asynchronous message production using `confluent_kafka.Producer` offloaded to a thread pool, with strict payload validation via JSON Schema.
-*   **Resilience & Retries:** Employs the `tenacity` library for network resilience. A centralized `@with_retry` decorator automatically applies exponential backoff for LLM, REST, and MCP transient errors (e.g., HTTP 429, 50x).
-*   **LLM Self-Correction (Reflection Loop):** Catches Pydantic `ValidationError`s during tool execution and prompts the LLM to fix its JSON schema output dynamically.
-*   **Strict State Management:** Uses Pydantic `BaseModel` for LangGraph state with properly annotated reducers (e.g., `operator.add` for message appends). Continually accumulates execution telemetry (tools invoked, token usage).
+*   **Динамическое выполнение графов:** Динамически создает и выполняет `StateGraph` из LangGraph на основе JSON-манифестов, сопоставляя узлы с асинхронными функциями Python, а ребра — с безопасной логикой условной маршрутизации.
+*   **Безопасная маршрутизация:** Использует AST-парсер для безопасного вычисления строковых правил условной маршрутизации из JSON-манифестов, избегая уязвимостей произвольного выполнения кода (ACE), связанных с использованием `eval()`.
+*   **Таймауты на уровне оркестрации:** Строго контролирует таймауты выполнения с использованием `asyncio.wait_for` на уровне API-оркестрации.
+*   **Обширная поддержка инструментов:**
+    *   **Встроенные инструменты:** Безопасные локальные операции, такие как AST-калькулятор и форматирование дат.
+    *   **Интеграция с REST API:** Декларативные вызовы с использованием `httpx.AsyncClient` с проверкой аргументов LLM через `jsonschema` и извлечением данных из полезной нагрузки с помощью `jsonpath-ng`, что позволяет экономить токены контекста. Для интерполяции шаблонов строго используется регулярное выражение `r'\{([a-zA-Z0-9_]+)\}'`, чтобы избежать случайного совпадения с фигурными скобками JSON.
+    *   **MCP (Model Context Protocol):** Интегрирует инструменты, динамически получаемые от MCP-сервера через транспорты SSE или stdio, используя `contextlib.AsyncExitStack` для управления жизненным циклом асинхронных операций. Преобразует внешние инструменты в объекты, совместимые с LangChain.
+    *   **Обмен сообщениями Kafka:** Асинхронная отправка сообщений с использованием `confluent_kafka.Producer`, вынесенная в пул потоков, со строгой проверкой полезной нагрузки через JSON Schema.
+*   **Устойчивость и повторные попытки:** Использует библиотеку `tenacity` для обеспечения сетевой устойчивости. Централизованный декоратор `@with_retry` автоматически применяет экспоненциальную задержку (exponential backoff) при временных ошибках (например, HTTP 429, 50x) для вызовов LLM, REST и MCP.
+*   **Самокоррекция LLM (Цикл рефлексии):** Перехватывает ошибки `ValidationError` от Pydantic во время выполнения инструментов и предлагает LLM динамически исправить вывод JSON-схемы.
+*   **Строгое управление состоянием:** Использует `BaseModel` из Pydantic для управления состоянием LangGraph с правильно аннотированными редюсерами (например, `operator.add` для добавления сообщений). Постоянно накапливает телеметрию выполнения (вызванные инструменты, использование токенов).
 
-## Architecture & Code Structure
+## Архитектура и структура кода
 
-The project code is primarily located in the `app/` directory:
+Код проекта в основном расположен в директории `app/`:
 
-*   **`app/api/`**: FastAPI routes. The entry point for execution is `POST /api/v1/player/execute` in `routes/player.py`.
-*   **`app/models/`**: Pydantic domain models, modularized (e.g., `api.py` for request/response contracts, `graph.py` for state, `manifest.py` for manifest definitions, `tools.py` for polymorphic tool schemas).
-*   **`app/services/`**: Core logic including `graph_builder.py` (LangGraph instantiation), `rest_api.py` (API tool executor), `mcp.py` (MCP client), `kafka.py` (Kafka producer), and `retry_utils.py`.
-*   **Configuration:** Managed by `pydantic-settings` via `app/config.py`.
-*   **Logging:** Structured JSON logging configured with `structlog`.
+*   **`app/api/`**: Маршруты FastAPI. Точка входа для выполнения — `POST /api/v1/player/execute` в `routes/player.py`.
+*   **`app/models/`**: Доменные модели Pydantic, разбитые на модули (например, `api.py` для контрактов запросов/ответов, `graph.py` для состояния, `manifest.py` для определений манифестов, `tools.py` для полиморфных схем инструментов).
+*   **`app/services/`**: Основная логика, включая `graph_builder.py` (создание LangGraph), `rest_api.py` (исполнитель инструментов API), `mcp.py` (клиент MCP), `kafka.py` (продюсер Kafka) и `retry_utils.py`.
+*   **Конфигурация:** Управляется с помощью `pydantic-settings` через `app/config.py`.
+*   **Логирование:** Структурированное JSON-логирование, настроенное с помощью `structlog`.
 
-## Usage & Development
+## Использование и разработка
 
-### Prerequisites
+### Предварительные требования
 
-The project relies on `uv` for dependency management.
+Проект использует `uv` для управления зависимостями.
 
-### Installation
+### Установка
 
 ```bash
-# Install dependencies using uv
+# Установка зависимостей с помощью uv
 uv sync
 ```
 
-### Running Locally
+### Запуск локально
 
 ```bash
-# Start the FastAPI server using uv
+# Запуск сервера FastAPI с помощью uv
 uv run app/main.py
 ```
 
-The application is containerized utilizing a lightweight `python:3.12-slim` image. Infrastructure such as Redis, Postgres, and Kafka can be managed via `docker-compose.yml`.
+Приложение контейнеризовано с использованием легковесного образа `python:3.12-slim`. Инфраструктура, такая как Redis, Postgres и Kafka, может управляться через `docker-compose.yml`.
 
-### Running Tests
+### Запуск тестов
 
-Testing is implemented with `pytest` and integrated into CI pipelines via GitHub Actions.
+Тестирование реализовано с помощью `pytest` и интегрировано в конвейеры CI через GitHub Actions.
 
 ```bash
-# Run tests ensuring correct Python path
+# Запуск тестов с обеспечением правильного пути Python
 PYTHONPATH=. uv run pytest
 ```
 
-## Contributing Guidelines
+## Руководство по участию в разработке
 
-Please see `AGENTS.md` for specific development instructions, architectural constraints, and security principles required when contributing to this project.
+Пожалуйста, ознакомьтесь с `AGENTS.md` для получения конкретных инструкций по разработке, архитектурных ограничений и принципов безопасности, необходимых при внесении вклада в этот проект.
